@@ -44,3 +44,16 @@ if (!$t3 || $t3->num_rows === 0) {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ");
 }
+
+// Ensure purchases columns exist (InfinityFree บางครั้ง schema ยังไม่อัปเดต)
+$tp = @$conn->query("SHOW TABLES LIKE 'purchases'");
+if ($tp && $tp->num_rows > 0) {
+    $col = @$conn->query("SHOW COLUMNS FROM purchases LIKE 'assigned_admin_id'");
+    if ($col && $col->num_rows === 0) {
+        @$conn->query("ALTER TABLE purchases ADD COLUMN assigned_admin_id INT(11) DEFAULT NULL");
+    }
+    $col2 = @$conn->query("SHOW COLUMNS FROM purchases LIKE 'admin_status'");
+    if ($col2 && $col2->num_rows === 0) {
+        @$conn->query("ALTER TABLE purchases ADD COLUMN admin_status VARCHAR(20) DEFAULT 'pending'");
+    }
+}

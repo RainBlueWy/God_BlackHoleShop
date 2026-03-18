@@ -8,16 +8,17 @@ $host = 'http://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
 $phpmyadmin = rtrim($host, '/') . '/phpmyadmin/';
 $god_blackhole = rtrim($host, '/') . '/god_blackhole/';
 
-// ลองเชื่อมต่อ MySQL
+// ใช้การตั้งค่า DB จาก config.php (localhost = XAMPP, ไม่ใช่ localhost = InfinityFree/เว็บโฮสต์)
 $db_ok = false;
 $db_error = '';
+$db_name_display = 'godblackholedb';
 if (extension_loaded('mysqli')) {
-    $conn = @new mysqli('localhost', 'root', '', 'godblackholedb');
-    if ($conn->connect_error) {
-        $db_error = $conn->connect_error;
-    } else {
+    require_once __DIR__ . '/config.php';
+    if (isset($conn) && !$conn->connect_error) {
         $db_ok = true;
-        $conn->close();
+        $db_name_display = DB_NAME;
+    } else {
+        $db_error = $conn->connect_error ?? 'Connection failed';
     }
 } else {
     $db_error = 'mysqli extension ไม่ได้เปิดใช้';
@@ -66,12 +67,12 @@ if (extension_loaded('mysqli')) {
     </div>
 
     <div class="card">
-        <h2>สถานะการเชื่อมต่อ MySQL (godblackholedb)</h2>
+        <h2>สถานะการเชื่อมต่อ MySQL (<?= htmlspecialchars($db_name_display) ?>)</h2>
         <?php if ($db_ok): ?>
             <p class="ok">✓ เชื่อมต่อฐานข้อมูลได้ปกติ</p>
         <?php else: ?>
             <p class="err">✗ เชื่อมต่อไม่ได้: <?= htmlspecialchars($db_error) ?></p>
-            <p class="muted">ตรวจสอบว่า MySQL ใน XAMPP กำลังรัน และมีฐานข้อมูลชื่อ <code>godblackholedb</code> (สร้างใน phpMyAdmin ถ้ายังไม่มี)</p>
+            <p class="muted">บน localhost: ตรวจสอบว่า MySQL ใน XAMPP กำลังรัน และมีฐานข้อมูลชื่อ <code>godblackholedb</code><br>บนเว็บโฮสต์: ตรวจสอบ Host/User/Password/DB ใน <code>config.php</code> และว่าชื่อ DB ตรงกับที่สร้างใน Control Panel</p>
         <?php endif; ?>
     </div>
 </body>

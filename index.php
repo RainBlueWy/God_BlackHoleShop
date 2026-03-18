@@ -132,7 +132,7 @@ header('Expires: 0');
                     </p>
                     <div class="hero-buttons">
                         <a href="categories.php" class="btn btn-primary"><span class="btn-icon" aria-hidden="true">🛒</span><span>ซื้อสินค้าเลย!</span></a>
-                        <a href="https://discord.gg/nBuwhHte" class="btn btn-secondary"><span class="btn-icon" aria-hidden="true">📱</span><span>ติดต่อเรา</span></a>
+                        <a href="https://discord.gg/T9cSBPGB" class="btn btn-secondary"><span class="btn-icon" aria-hidden="true">📱</span><span>ติดต่อเรา</span></a>
                     </div>
                 </div>
                 <div class="hero-image">

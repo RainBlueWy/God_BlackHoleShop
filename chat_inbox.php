@@ -70,6 +70,12 @@ if ($is_admin) {
     // ออเดอร์ล่าสุดที่มี assigned_admin_id (pending หรือ accepted ก็แสดงแชทได้ — ไม่ต้องรอแอดมินกดรับ)
     if ($aid === null) {
         $pc = @$conn->query("SHOW COLUMNS FROM purchases LIKE 'assigned_admin_id'");
+        if ($pc && $pc->num_rows === 0) {
+            // schema เก่า: เพิ่มคอลัมน์ให้ เพื่อให้ลูกค้าเห็นแชทบนโฮสต์ได้
+            @$conn->query("ALTER TABLE purchases ADD COLUMN assigned_admin_id INT(11) DEFAULT NULL");
+            @$conn->query("ALTER TABLE purchases ADD COLUMN admin_status VARCHAR(20) DEFAULT 'pending'");
+            $pc = @$conn->query("SHOW COLUMNS FROM purchases LIKE 'assigned_admin_id'");
+        }
         if ($pc && $pc->num_rows > 0) {
             $sql = "SELECT assigned_admin_id FROM purchases WHERE user_id = ? AND assigned_admin_id IS NOT NULL AND assigned_admin_id > 0 ORDER BY created_at DESC LIMIT 1";
             $pq = $conn->prepare($sql);
@@ -99,7 +105,8 @@ if ($is_admin) {
                     $ended_at = $row_te['ended_at'];
                     $has_status_col = @$conn->query("SHOW COLUMNS FROM purchases LIKE 'admin_status'");
                     $reopened_sql = "SELECT 1 FROM purchases WHERE user_id = ? AND assigned_admin_id = ? AND created_at > ?";
-                    if ($has_status_col && $has_status_col->num_rows > 0) $reopened_sql .= " AND (admin_status = 'accepted' OR admin_status IS NULL)";
+                    // ต้องให้ลูกค้าเห็นแชททันทีหลังซื้อ (pending ก็เปิดแชทได้) — ไม่ต้องรอแอดมินกดรับ
+                    if ($has_status_col && $has_status_col->num_rows > 0) $reopened_sql .= " AND (admin_status IN ('accepted','pending') OR admin_status IS NULL)";
                     $reopened_sql .= " LIMIT 1";
                     $pq = $conn->prepare($reopened_sql);
                     if ($pq) {

@@ -1,0 +1,14 @@
+# Basic Security
+Options -Indexes
+
+# Prefer index.html (then index.php)
+DirectoryIndex index.html index.php
+
+# Hide .php extension
+RewriteEngine On
+# บน InfinityFree ใช้ / ; บน XAMPP โฟลเดอร์ย่อย อาจใช้ /god_blackhole/
+RewriteBase /
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME}.php -f
+RewriteRule ^(.*)$ $1.php [L,QSA]

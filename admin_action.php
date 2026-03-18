@@ -219,14 +219,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if ($sale_price === '') $sale_price = null;
 
+        // sub_category_id: ถ้าไม่เลือกให้เป็น 0 แล้วค่อยแปลงเป็น NULL ใน SQL (NULLIF)
+        $sub_category_id_raw = isset($_POST['sub_category_id']) && $_POST['sub_category_id'] !== '' ? (int)$_POST['sub_category_id'] : 0;
+        $col_sub = $conn->query("SHOW COLUMNS FROM products LIKE 'sub_category_id'");
+        if ($col_sub && $col_sub->num_rows === 0) $conn->query("ALTER TABLE products ADD COLUMN sub_category_id INT(11) DEFAULT NULL AFTER category");
+
         if ($action === 'add_product') {
-            $sql = "INSERT INTO products (name, slug, category, price, sale_price, max_slots, sold_count, description, image, features, script_content) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)";
+            $sql = "INSERT INTO products (name, slug, category, price, sale_price, max_slots, sold_count, description, image, features, script_content, sub_category_id) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, NULLIF(?,0))";
             $stmt = $conn->prepare($sql);
-            $stmt->bind_param("sssssissss", $name, $slug, $category, $price, $sale_price, $max_slots, $description, $image_url, $features_json, $script_content);
+            $stmt->bind_param("sssssissssi", $name, $slug, $category, $price, $sale_price, $max_slots, $description, $image_url, $features_json, $script_content, $sub_category_id_raw);
         } else {
-            $sql = "UPDATE products SET name=?, slug=?, category=?, price=?, sale_price=?, max_slots=?, sold_count=0, description=?, image=?, features=?, script_content=?, updated_at=NOW() WHERE id=?";
+            $sql = "UPDATE products SET name=?, slug=?, category=?, price=?, sale_price=?, max_slots=?, sold_count=0, description=?, image=?, features=?, script_content=?, sub_category_id=NULLIF(?,0), updated_at=NOW() WHERE id=?";
             $stmt = $conn->prepare($sql);
-            $stmt->bind_param("sssssissssi", $name, $slug, $category, $price, $sale_price, $max_slots, $description, $image_url, $features_json, $script_content, $id);
+            $stmt->bind_param("sssssissssii", $name, $slug, $category, $price, $sale_price, $max_slots, $description, $image_url, $features_json, $script_content, $sub_category_id_raw, $id);
         }
 
         if ($stmt->execute()) {

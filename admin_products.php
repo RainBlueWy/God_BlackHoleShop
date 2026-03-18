@@ -12,9 +12,25 @@ if (!isset($_GET['inapp'])) {
     exit;
 }
 
+// สร้างตารางหมวดหมู่ถ้ายังไม่มี
+$conn->query("CREATE TABLE IF NOT EXISTS main_categories (id INT(11) AUTO_INCREMENT PRIMARY KEY, name VARCHAR(100) NOT NULL, slug VARCHAR(50) NOT NULL UNIQUE, image VARCHAR(255) DEFAULT NULL, sort_order INT(11) NOT NULL DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+$conn->query("CREATE TABLE IF NOT EXISTS sub_categories (id INT(11) AUTO_INCREMENT PRIMARY KEY, main_id INT(11) NOT NULL, name VARCHAR(100) NOT NULL, slug VARCHAR(50) NOT NULL, image VARCHAR(255) DEFAULT NULL, sort_order INT(11) NOT NULL DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, KEY idx_main (main_id), UNIQUE KEY uq_main_slug (main_id, slug)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+$col = $conn->query("SHOW COLUMNS FROM products LIKE 'sub_category_id'");
+if ($col && $col->num_rows === 0) $conn->query("ALTER TABLE products ADD COLUMN sub_category_id INT(11) DEFAULT NULL AFTER category");
+
 // Fetch all products
 $sql = "SELECT * FROM products ORDER BY updated_at DESC, id DESC";
 $result = $conn->query($sql);
+
+// หมวดหมู่ย่อย (สำหรับ dropdown ในฟอร์ม)
+$sub_categories = [];
+$res = $conn->query("SELECT s.id, s.name, s.slug, s.main_id, m.name AS main_name FROM sub_categories s LEFT JOIN main_categories m ON m.id = s.main_id ORDER BY m.sort_order, m.id, s.sort_order, s.id");
+if ($res) while ($r = $res->fetch_assoc()) $sub_categories[] = $r;
+
+// หมวดหมู่หลัก (สำหรับ dropdown)
+$main_categories = [];
+$resm = $conn->query("SELECT id, name, slug FROM main_categories ORDER BY sort_order ASC, id ASC");
+if ($resm) while ($r = $resm->fetch_assoc()) $main_categories[] = $r;
 ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -104,6 +120,9 @@ $result = $conn->query($sql);
             border-radius: 5px;
             color: white;
         }
+        /* ให้ตัวหนังสือใน dropdown/option เป็นสีดำ (กันพื้นหลังขาวอ่านไม่ออก) */
+        select.form-control { color: #111; background: rgba(255,255,255,0.92); }
+        select.form-control option { color: #111; background: #fff; }
     </style>
 </head>
 <body>
@@ -238,8 +257,33 @@ endif; ?>
                 </div>
 
                 <div class="form-group">
-                    <label>หมวดหมู่ (Category)</label>
+                    <label>หมวดหมู่ (Category) — ข้อความแสดงใต้ชื่อสินค้า</label>
                     <input type="text" name="category" id="prodCategory" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label>หมวดหมู่หลัก (เลือกก่อน)</label>
+                    <select id="prodMainCategory" class="form-control">
+                        <option value="">— เลือกหมวดหมู่หลัก —</option>
+                        <?php foreach ($main_categories as $m): ?>
+                        <option value="<?= (int)$m['id'] ?>"><?= htmlspecialchars($m['name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>หมวดหมู่ย่อย (แสดงในหน้าหมวดหมู่)</label>
+                    <select name="sub_category_id" id="prodSubCategory" class="form-control">
+                        <option value="">— ไม่ระบุ (แสดงใน "ทั้งหมด") —</option>
+                        <?php
+                        $cur_main = '';
+                        foreach ($sub_categories as $s):
+                            if ($s['main_name'] !== $cur_main) {
+                                $cur_main = $s['main_name'];
+                                echo '<option value="" disabled>── ' . htmlspecialchars($cur_main) . ' ──</option>';
+                            }
+                        ?>
+                        <option value="<?= (int)$s['id'] ?>" data-main-id="<?= (int)$s['main_id'] ?>"><?= htmlspecialchars($s['name']) ?> (<?= htmlspecialchars($s['slug']) ?>)</option>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
 
                 <div class="form-group">
@@ -301,6 +345,19 @@ endif; ?>
                 document.getElementById('prodSalePrice').value = salePrice;
                 document.getElementById('prodMaxSlots').value = (data.max_slots != null && data.max_slots !== '') ? (parseInt(data.max_slots, 10) || 0) : 0;
                 document.getElementById('prodCategory').value = data.category;
+                // ตั้งค่า main/sub ให้สัมพันธ์กัน
+                var subSel = document.getElementById('prodSubCategory');
+                var mainSel = document.getElementById('prodMainCategory');
+                var subId = (data.sub_category_id != null && data.sub_category_id !== '') ? String(data.sub_category_id) : '';
+                if (subId) {
+                    var opt = subSel.querySelector('option[value=\"' + subId.replace(/\"/g,'') + '\"]');
+                    var mid = opt ? (opt.getAttribute('data-main-id') || '') : '';
+                    if (mainSel) mainSel.value = mid;
+                } else {
+                    if (mainSel) mainSel.value = '';
+                }
+                filterSubCategories();
+                subSel.value = subId;
                 document.getElementById('prodImage').value = data.image;
                 document.getElementById('prodDesc').value = data.description;
                 
@@ -318,6 +375,9 @@ endif; ?>
                 form.reset();
                 document.getElementById('prodMaxSlots').value = 0;
                 document.getElementById('prodSalePrice').value = '';
+                document.getElementById('prodSubCategory').value = '';
+                document.getElementById('prodMainCategory').value = '';
+                filterSubCategories();
             }
         }
 
@@ -330,6 +390,26 @@ endif; ?>
                 closeModal();
             }
         }
+
+        function filterSubCategories() {
+            var mainSel = document.getElementById('prodMainCategory');
+            var subSel = document.getElementById('prodSubCategory');
+            if (!mainSel || !subSel) return;
+            var mid = mainSel.value;
+            var keep = new Set();
+            // แสดง option ที่เป็น placeholder เสมอ (value = '' หรือ disabled headers)
+            Array.prototype.forEach.call(subSel.options, function(o){
+                if (o.disabled) { o.hidden = false; return; }
+                if (o.value === '') { o.hidden = false; return; }
+                var omid = o.getAttribute('data-main-id') || '';
+                o.hidden = (mid !== '' && omid !== mid);
+            });
+            // ถ้าเลือก sub ที่ไม่ตรง main แล้ว ให้รีเซ็ต
+            var cur = subSel.value;
+            if (cur && subSel.selectedOptions.length && subSel.selectedOptions[0].hidden) subSel.value = '';
+        }
+        var mainSelEl = document.getElementById('prodMainCategory');
+        if (mainSelEl) mainSelEl.addEventListener('change', filterSubCategories);
 
         // ราคา: ถ้าใส่เลข ให้ลงท้ายด้วย ฿ เสมอ (ตอน blur)
         const priceInput = document.getElementById('prodPrice');

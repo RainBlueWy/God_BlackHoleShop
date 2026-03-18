@@ -11,7 +11,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $page = isset($_GET['page']) ? preg_replace('/[^a-z0-9_]/', '', $_GET['page']) : 'index';
-$allowed = ['index', 'profile', 'categories', 'product', 'checkout', 'admin_panel', 'admin_products', 'admin_user_edit', 'topup', 'topup_history', 'admin_topups', 'admin_orders'];
+$allowed = ['index', 'profile', 'categories', 'product', 'checkout', 'admin_panel', 'admin_products', 'admin_user_edit', 'admin_categories', 'topup', 'topup_history', 'admin_topups', 'admin_orders'];
 if (!in_array($page, $allowed)) $page = 'index';
 
 $iframe_src = $page . '.php?inapp=1';
@@ -64,7 +64,7 @@ if ($page === 'admin_user_edit' && !empty($_GET['id'])) {
     (function() {
         var iframe = document.getElementById('gbhContent');
         if (!iframe) return;
-        var allowed = ['index','profile','categories','product','checkout','admin_panel','admin_products','admin_user_edit', 'topup', 'topup_history', 'admin_topups', 'admin_orders'];
+        var allowed = ['index','profile','categories','product','checkout','admin_panel','admin_products','admin_user_edit','admin_categories', 'topup', 'topup_history', 'admin_topups', 'admin_orders'];
         function updateUrl() {
             try {
                 var loc = iframe.contentWindow.location;

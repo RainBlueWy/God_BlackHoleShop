@@ -19,7 +19,7 @@ if ($is_localhost) {
     define('DB_PASS', '');
     define('DB_NAME', 'godblackholedb'); // สร้าง DB นี้ใน phpMyAdmin ถ้ายังไม่มี
 } else {
-    // Database credentials for InfinityFree (ใช้ค่าตามแอคที่โดเมนเว็บอยู่: MySQL panel)
+    // Database credentials for InfinityFree (จาก MySQL Connection Details ใน cPanel)
     define('DB_HOST', 'sql104.infinityfree.com');
     define('DB_USER', 'if0_41391330');
     define('DB_PASS', 'FpnaemoKsn7Aw5T');

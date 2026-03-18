@@ -24,9 +24,42 @@ if ($cr && $cr->num_rows > 0) {
     while ($r = $cr->fetch_assoc()) $purchase_counts[(int)$r['product_id']] = (int)$r['c'];
 }
 
-$result = $conn->query("SELECT * FROM products ORDER BY updated_at DESC, id DESC");
+$main_slug = isset($_GET['main']) ? trim($_GET['main']) : '';
+$sub_slug = isset($_GET['sub']) ? trim($_GET['sub']) : '';
+$show_all = isset($_GET['all']) && $_GET['all'] === '1';
+
+$sql = "SELECT * FROM products";
+if (!$show_all && $main_slug !== '' && $sub_slug !== '') {
+    $main_row = null;
+    $stmt = $conn->prepare("SELECT id FROM main_categories WHERE slug = ? LIMIT 1");
+    $stmt->bind_param("s", $main_slug);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    if ($res && $row = $res->fetch_assoc()) $main_row = $row;
+    $stmt->close();
+    if ($main_row) {
+        $stmt = $conn->prepare("SELECT id FROM sub_categories WHERE main_id = ? AND slug = ? LIMIT 1");
+        $mid = (int)$main_row['id'];
+        $stmt->bind_param("is", $mid, $sub_slug);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $sub_row = $res ? $res->fetch_assoc() : null;
+        $stmt->close();
+        if ($sub_row) {
+            $sid = (int)$sub_row['id'];
+            if ($sub_slug === 'all') {
+                // all = สินค้าทั้งหมดภายใต้หมวดหลักนี้ (ทุกหมวดหมู่ย่อยของ main_id)
+                $sql = "SELECT p.* FROM products p INNER JOIN sub_categories s ON s.id = p.sub_category_id WHERE s.main_id = $mid";
+            } else {
+                $sql .= " WHERE sub_category_id = $sid";
+            }
+        }
+    }
+}
+$sql .= " ORDER BY updated_at DESC, id DESC";
+$result = $conn->query($sql);
 if (!$result || $result->num_rows === 0) {
-    echo '<p style="text-align:center;width:100%;color:#fff;">ไม่พบสินค้าในระบบ</p>';
+    echo '<p style="text-align:center;width:100%;color:var(--text-muted);">ไม่พบสินค้าในหมวดนี้</p>';
     exit;
 }
 
